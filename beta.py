@@ -41,8 +41,8 @@ import json
 from dotenv import load_dotenv
 load_dotenv()
 
-#import psycopg2
-#import psycopg2.extras as extras
+import psycopg2
+import psycopg2.extras as extras
 
 #importing ibm watson ToneAnalyzerV3 and authenticator
 from ibm_watson import ToneAnalyzerV3
