@@ -288,13 +288,13 @@ print('Table dropped')
 # CREATE a NEW TABLES if not exists (currently commented out)
  
 execute_query(conn, 
-CREATE TABLE IF NOT EXISTS public.slack_sentiment (
+"CREATE TABLE IF NOT EXISTS public.slack_sentiment (
    SCORE float not NULL,
    tone_id VARCHAR (255) NULL,
    tone_name VARCHAR (255) NULL,
    utterance_id int not NULL,
    utterance_text VARCHAR (15000) NULL
-);) 
+);") 
  
 print('the slack_sentiment table has been created')
 
