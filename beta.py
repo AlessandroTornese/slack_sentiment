@@ -3,26 +3,21 @@
 
 # costants
 
-# In[2]: keys are stored in a .env file 
-
-
+'''
 SLACK_BOT_TOKEN ="TOKEN"
 
 
-host ="SERVER"
-database="DBNAME"
-user="USER_ID"
-password= "PASSWORD"
+
 
 
 apikey='APIKEY'
 ta_url= 'ENDPOINT'
 
 channel_id ='CHANNEL'
-
+'''
 
 # Importing modules
-# 
+#
 
 # In[3]:
 
@@ -38,9 +33,6 @@ from slack_sdk.errors import SlackApiError
 import pandas as pd
 import json
 
-from dotenv import load_dotenv
-load_dotenv()
-
 import psycopg2
 import psycopg2.extras as extras
 
@@ -48,25 +40,57 @@ import psycopg2.extras as extras
 from ibm_watson import ToneAnalyzerV3
 from ibm_cloud_sdk_core.authenticators  import IAMAuthenticator
 #setting key and url (to be moved to the .env file with all the other credentials)
-authenticator= IAMAuthenticator(apikey)
+authenticator= IAMAuthenticator(os.environ.get("APIKEY"))
 ta= ToneAnalyzerV3(version ='2017-09-21', authenticator = authenticator)
-ta.set_service_url(ta_url)
+ta.set_service_url(os.environ.get("ENDPOINT"))
 
 
-# Connecting to the slack channel 
+# Creating a dictionary containing db credentials
+
+SERVER = os.environ.get("SERVER")
+DBNAME = os.environ.get("DBNAME")
+USER_ID = os.environ.get("USER_ID")
+PASSWORD = os.environ.get("PASSWORD")
+# In[2]: keys are stored in a .env file
+
+param_dic = {
+    "host"      :  SERVER,
+    "database"  :  DBNAME,
+    "user"      :  USER_ID,
+    "password"  :  PASSWORD
+}
+# In[ ]: Defining a function to establish connection with the db
+
+print(param_dic)
+
+def connect(params_dic):
+    """ Connect to the PostgreSQL database server """
+    conn = None
+    try:
+        # connect to the PostgreSQL server
+        print('Connecting to the PostgreSQL database...')
+        conn = psycopg2.connect(**params_dic)
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+        sys.exit(1)
+    print("Connection successful")
+    return conn
+conn = connect(param_dic)
+
+# Connecting to the slack channel
 
 # In[4]:
 
 
 # WebClient insantiates a client that can call API methods
 # When using Bolt, you can use either `app.client` or the `client` passed to listeners.
-client = WebClient(token= SLACK_BOT_TOKEN)
+client = WebClient(token= os.environ.get("TOKEN"))
 
 logger = logging.getLogger(__name__)
 # Store conversation history
 conversation_history = []
 # ID of the channel you want to send the message to
-channel_id = "C029R2BR8GJ"   #os.getenv("channel_id")
+channel_id = (os.environ.get("CHANNEL"))
 
 try:
     # Call the conversations.history method using the WebClient
@@ -110,7 +134,7 @@ timestamps =list(df['ts'])
 len(timestamps)
 
 
-# looping through the df to get the text 
+# looping through the df to get the text
 
 # In[9]:
 
@@ -142,8 +166,8 @@ chat_concat
 
 
 ts= chat_concat[['ts', 'text','user']] #creating this dataframe for later use to bring timestamps to the sentiment df
-# filtering from df only text and users for feeding Tone Analyzer 
-chats_text_users = chat_concat[['text', 'user']]  
+# filtering from df only text and users for feeding Tone Analyzer
+chats_text_users = chat_concat[['text', 'user']]
 
 chats = chats_text_users[chats_text_users.user.notnull()]
 chats
@@ -153,7 +177,7 @@ chats
 
 
 chats = pd.DataFrame(chats)
-users = set(chats.user) #getting distinct users for later join 
+users = set(chats.user) #getting distinct users for later join
 chats = chats.to_dict('records')
 
 
@@ -167,7 +191,7 @@ res = res["utterances_tone"]
 # In[125]:
 
 
-#flattening the nesting dictionary to make it tabular 
+#flattening the nesting dictionary to make it tabular
 sentiment =pd.json_normalize(res, meta=['utterance_id','utterance_text'], record_path=['tones'])
 sentiment.head(15)
 
@@ -206,45 +230,25 @@ for user_id in users:
             user= user_id
         )
         logger.info(result)
-        
+
     except SlackApiError as e:
         logger.error("Error fetching conversations: {}".format(e))
     for res in result:
         user_details.append(result['user'])
 user_details
-    
+
 
 
 # In[126]:
 
 
 users_df =pd.json_normalize(user_details)
-users_df 
+users_df
 
 
-# In[ ]:
-
-param_dic = {
-    "host"      : os.getenv("host"),
-    "database"  : os.getenv("database"),
-    "user"      : os.getenv("user"),
-    "password"  : os.getenv("password")
-}
 
 
-def connect(params_dic):
-    """ Connect to the PostgreSQL database server """
-    conn = None
-    try:
-        # connect to the PostgreSQL server
-        print('Connecting to the PostgreSQL database...')
-        conn = psycopg2.connect(**params_dic)
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
-        sys.exit(1)
-    print("Connection successful")
-    return conn
-conn = connect(param_dic)
+
 
 
 # DEFINING A FUNCTION TO RUN SQL SCRIPTS
@@ -285,17 +289,14 @@ print('Table dropped')
 # In[19]:
 
 
-# CREATE a NEW TABLES if not exists (currently commented out)
- 
-execute_query(conn, ''' 
-CREATE TABLE IF NOT EXISTS public.slack_sentiment (
-   SCORE float not NULL,
-   tone_id VARCHAR (255) NULL,
-   tone_name VARCHAR (255) NULL,
+# CREATE a NEW TABLES if not exists
+
+execute_query(conn, '''CREATE TABLE IF NOT EXISTS slack_sentiment(SCORE float not NULL,
+tone_id VARCHAR (255) NULL,
+tone_name VARCHAR (255) NULL,
    utterance_id int not NULL,
-   utterance_text VARCHAR (15000) NULL
-);''') 
- 
+   utterance_text VARCHAR (15000) NULL);''')
+
 print('the slack_sentiment table has been created')
 
 
@@ -335,4 +336,3 @@ def execute_values(conn, df, table):
 #get_ipython().run_line_magic('time', '')
 # push the data into the db
 execute_values(conn, df, 'slack_sentiment')
-
