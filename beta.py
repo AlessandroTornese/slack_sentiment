@@ -38,8 +38,8 @@ from slack_sdk.errors import SlackApiError
 import pandas as pd
 import json
 
-#from dotenv import load_dotenv
-#load_dotenv()
+from dotenv import load_dotenv
+load_dotenv()
 
 import psycopg2
 import psycopg2.extras as extras
